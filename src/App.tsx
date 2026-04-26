@@ -845,7 +845,7 @@ function DailyTest({ user }: { user: UserProfile }) {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Daily practice set containing questions from Quant, VARC, and DILR. 
+                    The Daily Sprint for MBA Success. One test per day.
                   </p>
                   {attempts[t.id] && (
                     <div className="flex items-center gap-4 mb-4 p-3 bg-secondary/30 rounded-lg">
