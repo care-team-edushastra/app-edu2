@@ -1069,11 +1069,105 @@ function DailyTest({ user }: { user: UserProfile }) {
 
 function TestHistory({ user }: { user: UserProfile }) {
   const [results, setResults] = useState<any[]>([]);
-
+  const [reviewingResult, setReviewingResult] = useState<any | null>(null);
+  const [reviewingTest, setReviewingTest] = useState<any | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
   useEffect(() => {
     apiRequest("/performance").then(setResults);
   }, []);
+const handleReview = async (res: any) => {
+    setLoadingReview(true);
+    setReviewingResult(res);
+    try {
+      const testData = await apiRequest(`/daily-test/${res.testId}`);
+      setReviewingTest(testData);
+    } catch (err: any) {
+      toast.error("Failed to load test details for review.");
+      setReviewingResult(null);
+    } finally {
+      setLoadingReview(false);
+    }
+  };
 
+  if (loadingReview) return <div className="text-center py-20">Loading review...</div>;
+
+  if (reviewingResult && reviewingTest) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => { setReviewingResult(null); setReviewingTest(null); }}>
+            <ChevronRight className="rotate-180" size={16} /> Back to History
+          </Button>
+        </div>
+        <header className="text-center space-y-2">
+          <h1 className="text-3xl font-bold">Test Results</h1>
+          <p className="text-muted-foreground">Review your past practice attempt!</p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="text-center p-6">
+            <p className="text-sm text-muted-foreground mb-1">Score</p>
+            <p className="text-3xl font-bold text-primary">{reviewingResult.totalScore}%</p>
+          </Card>
+          <Card className="text-center p-6">
+            <p className="text-sm text-muted-foreground mb-1">Correct</p>
+            <p className="text-3xl font-bold text-green-600">{reviewingResult.correctAnswers}</p>
+          </Card>
+          <Card className="text-center p-6">
+            <p className="text-sm text-muted-foreground mb-1">Wrong</p>
+            <p className="text-3xl font-bold text-red-600">{reviewingResult.wrongAnswers}</p>
+          </Card>
+          <Card className="text-center p-6">
+            <p className="text-sm text-muted-foreground mb-1">Time</p>
+            <p className="text-3xl font-bold">{Math.floor(reviewingResult.timeSpent / 60)}m {reviewingResult.timeSpent % 60}s</p>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold">Review Questions</h2>
+          {reviewingTest?.questions?.map((q: Question, idx: number) => (
+            <Card key={q.id} className={`border-l-4 ${
+              reviewingResult.studentAnswers[q.id] === q.correctAnswer ? "border-l-green-500" : 
+              !reviewingResult.studentAnswers[q.id] ? "border-l-yellow-500" : "border-l-red-500"
+            }`}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-center mb-2">
+                  <Badge variant="outline">{q.section}</Badge>
+                  {reviewingResult.studentAnswers[q.id] === q.correctAnswer ? (
+                    <span className="text-green-600 flex items-center gap-1 text-xs font-bold"><CheckCircle2 size={14} /> Correct</span>
+                  ) : !reviewingResult.studentAnswers[q.id] ? (
+                    <span className="text-yellow-600 flex items-center gap-1 text-xs font-bold"><AlertCircle size={14} /> Skipped</span>
+                  ) : (
+                    <span className="text-red-600 flex items-center gap-1 text-xs font-bold"><XCircle size={14} /> Incorrect</span>
+                  )}
+                </div>
+                <CardTitle className="text-base">Q{idx + 1}: {q.questionText}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-2">
+                  {q.options.map((opt) => (
+                    <div 
+                      key={opt} 
+                      className={`p-3 rounded-lg border text-sm ${
+                        opt === q.correctAnswer ? "bg-green-50 border-green-200 text-green-800 font-medium" :
+                        opt === reviewingResult.studentAnswers[q.id] ? "bg-red-50 border-red-200 text-red-800" : "bg-secondary/20"
+                      }`}
+                    >
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-secondary/30 p-4 rounded-lg text-sm">
+                  <p className="font-bold mb-1">Explanation:</p>
+                  <p className="text-muted-foreground">{q.explanation}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <header>
