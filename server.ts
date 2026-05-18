@@ -305,8 +305,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
     
-    const prompt = `Generate 20 MCQ questions for CAT exam preparation.
-    Distribution:
+ xport async function generateDailyQuestions(examType: "CAT" | "GMAT" | "CUET" = "CAT") {
+  const prompt = `Generate 20 MCQ questions for ${examType} exam preparation.
     - 7 Quantitative Aptitude (Medium-Hard difficulty)
     - 7 DILR (Data Interpretation & Logical Reasoning)
     - 6 VARC (Verbal Ability & Reading Comprehension)
