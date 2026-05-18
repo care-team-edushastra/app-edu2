@@ -59,6 +59,7 @@ interface UserProfile {
   name: string;
   email: string;
   role: Role;
+   targetExam: "CAT" | "GMAT" | "CUET" | "ALL";
 }
 
 interface Question {
@@ -69,6 +70,7 @@ interface Question {
   correctAnswer: string;
   explanation: string;
   difficulty: string;
+    targetExam: "CAT" | "GMAT" | "CUET";
 }
 
 // --- Components ---
@@ -399,9 +401,18 @@ function Dashboard({ user, setActiveTab }: { user: UserProfile, setActiveTab: (t
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name.split(' ')[0]}! 👋</h1>
-          <p className="text-muted-foreground">Here's what's happening with your preparation today.</p>
+                   <p className="text-muted-foreground">
+            {user.role === 'student' 
+              ? `You are preparing for ${user.targetExam}. Here's what's happening today.` 
+              : "Here's what's happening with prep today."}
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-background p-1 rounded-lg border shadow-sm">
+           {user.role === 'student' && (
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 px-3 py-1">
+              Target: {user.targetExam}
+            </Badge>
+          )}
           <Button variant="ghost" size="sm" className="gap-2">
             <Clock size={16} />
             <span>IST: {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}</span>
@@ -829,13 +840,16 @@ function DailyTest({ user }: { user: UserProfile }) {
                 <CardHeader>
                   <div className="flex justify-between items-center mb-2">
                     <Badge variant="outline">{new Date(t.testDate).toLocaleDateString()}</Badge>
+                     <div className="flex gap-2">
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t.targetExam}</Badge>
                     {attempts[t.id] ? (
                       <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Completed</Badge>
                     ) : (
                       <Badge variant="secondary">Pending</Badge>
                     )}
                   </div>
-                  <CardTitle className="text-lg">Daily Practice Test</CardTitle>
+                   </div>
+                  <CardTitle className="text-lg">{t.targetExam} Practice Test</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
@@ -1313,14 +1327,23 @@ function Analytics({ user }: { user: UserProfile }) {
 function AdminDashboard({ user }: { user: UserProfile }) {
   const [unverified, setUnverified] = useState<any[]>([]);
   const [approved, setApproved] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [activeTab, setActiveTab] = useState("queue");
-  const [newMaterial, setNewMaterial] = useState({ topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", description: "" });
-  const [newVideo, setNewVideo] = useState({ topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", duration: "", instructorName: "" });
+  const [activeTab, setActiveTab] = useState("students");
+  
+  const [newMaterial, setNewMaterial] = useState({ 
+    topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", description: "", targetExam: "CAT" as any
+  });
+  const [newVideo, setNewVideo] = useState({ 
+    topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", duration: "", instructorName: "", targetExam: "CAT" as any
+  });
+  const [examType, setExamType] = useState<"CAT" | "GMAT" | "CUET">("CAT");
+
 
   useEffect(() => {
     refreshQueue();
+    loadStudents();
   }, []);
 
   const refreshQueue = async () => {
@@ -1336,7 +1359,28 @@ function AdminDashboard({ user }: { user: UserProfile }) {
     setUnverified(filteredUnverified);
     setApproved(ap);
   };
+ const loadStudents = async () => {
+    try {
+      const data = await apiRequest("/students");
+      setStudents(data);
+    } catch (err: any) {
+      toast.error("Failed to load students");
+    }
+  };
 
+  const updateStudentExam = async (studentId: string, exam: string) => {
+    try {
+      await apiRequest(`/students/${studentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ targetExam: exam })
+      });
+      toast.success("Student category updated");
+      loadStudents();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+  
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1344,8 +1388,8 @@ function AdminDashboard({ user }: { user: UserProfile }) {
         method: "POST",
         body: JSON.stringify({ ...newMaterial, id: `CM${Date.now()}`, dateAdded: new Date().toISOString() })
       });
-      toast.success("Course material added to Google Sheet!");
-      setNewMaterial({ topicName: "", section: "Quant", googleSheetLink: "", googleDriveLink: "", description: "" });
+  toast.success("Course material added!");
+      setNewMaterial({ topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", description: "", targetExam: "CAT" });
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -1358,30 +1402,24 @@ function AdminDashboard({ user }: { user: UserProfile }) {
         method: "POST",
         body: JSON.stringify({ ...newVideo, id: `VL${Date.now()}`, dateUploaded: new Date().toISOString() })
       });
-      toast.success("Video lecture added to Google Sheet!");
-      setNewVideo({ topicName: "", section: "Quant", googleSheetLink: "", googleDriveLink: "", duration: "", instructorName: "" });
+         toast.success("Video lecture added!");
+      setNewVideo({ topicName: "", section: "Quantitative", googleSheetLink: "", googleDriveLink: "", duration: "", instructorName: "", targetExam: "CAT" });
     } catch (err: any) {
       toast.error(err.message);
     }
   };
 
-  const handleGenerate = async () => {
+ const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const response = await fetch("/api/generate-questions", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${localStorage.getItem("token")}`
-  }
-});
-const questions = await response.json();
+      const questions = await generateDailyQuestions(examType);
+      const questionsWithExam = questions.map((q: any) => ({ ...q, targetExam: examType }));
       await apiRequest("/questions/save-unverified", {
         method: "POST",
-        body: JSON.stringify({ questions })
+        body: JSON.stringify({ questions: questionsWithExam })
       });
       refreshQueue();
-      toast.success("Generated 20 new questions!");
+      toast.success(`Generated 20 new ${examType} questions!`);
     } catch (err: any) {
       toast.error("Generation failed: " + err.message);
     } finally {
@@ -1403,26 +1441,27 @@ const questions = await response.json();
   };
 
   const handlePublishTest = async () => {
-    if (approved.length < 20) {
-      toast.error(`Need at least 20 approved questions. You have ${approved.length}.`);
+    const categoryApproved = approved.filter(q => q.targetExam === examType);
+    if (categoryApproved.length < 20) {
+      toast.error(`Need at least 20 approved questions for ${examType}. You have ${categoryApproved.length}.`);
       return;
     }
 
     setPublishing(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      // Pick 20 most recent approved questions
-      const selectedIds = approved.slice(-20).map(q => q.id);
+      const selectedIds = categoryApproved.slice(-20).map(q => q.id);
       
       await apiRequest("/daily-test/publish", {
         method: "POST",
         body: JSON.stringify({
           testDate: today,
-          questionIds: selectedIds
+          questionIds: selectedIds,
+          targetExam: examType
         })
       });
       
-      toast.success("Today's test published to Google Sheets!");
+      toast.success(`${examType} test published for today!`);
     } catch (err: any) {
       toast.error("Publication failed: " + err.message);
     } finally {
@@ -1432,185 +1471,268 @@ const questions = await response.json();
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage questions, students, and system settings.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePublishTest} disabled={publishing || approved.length < 20} className="gap-2 h-11 px-6">
-            <CheckCircle2 size={20} className="text-green-500" />
-            {publishing ? "Publishing..." : "Publish Today's Test"}
-          </Button>
-          <Button onClick={handleGenerate} disabled={generating} className="gap-2 h-11 px-6">
-            <BrainCircuit size={20} />
-            {generating ? "Generating with AI..." : "AI Generate Questions"}
-          </Button>
-        </div>
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
+        <p className="text-muted-foreground">Manage students, questions, and learning resources.</p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3 space-y-6">
-          <Tabs defaultValue="queue" className="w-full">
-            <TabsList>
-              <TabsTrigger value="queue" className="gap-2">
-                Queue <Badge variant="secondary">{unverified.length}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="approved" className="gap-2">
-                Approved <Badge variant="secondary">{approved.length}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="resources" className="gap-2">
-                Resources
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="resources" className="space-y-6 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <BookOpen size={18} className="text-primary" />
-                      Add Course Material
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleAddMaterial} className="space-y-3">
-                      <Input placeholder="Topic Name" value={newMaterial.topicName} onChange={e => setNewMaterial({...newMaterial, topicName: e.target.value})} required />
-                      <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" value={newMaterial.section} onChange={e => setNewMaterial({...newMaterial, section: e.target.value})}>
-                        <option value="Quantitative">Quantitative</option>
-                        <option value="VARC">VARC</option>
-                        <option value="DILR">DILR</option>
-                      </select>
-                      <Input placeholder="Google Sheets Link" value={newMaterial.googleSheetLink} onChange={e => setNewMaterial({...newMaterial, googleSheetLink: e.target.value})} required />
-                      <Input placeholder="Google Drive Link" value={newMaterial.googleDriveLink} onChange={e => setNewMaterial({...newMaterial, googleDriveLink: e.target.value})} />
-                      <textarea className="w-full p-3 rounded-md border border-input bg-background text-sm min-h-[80px]" placeholder="Description" value={newMaterial.description} onChange={e => setNewMaterial({...newMaterial, description: e.target.value})} />
-                      <Button type="submit" className="w-full">Save to Sheet</Button>
-                    </form>
-                  </CardContent>
-                </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 w-full lg:w-[600px] h-12 bg-background border p-1 rounded-xl">
+          <TabsTrigger value="students" className="rounded-lg">Students</TabsTrigger>
+          <TabsTrigger value="queue" className="rounded-lg">Queue</TabsTrigger>
+          <TabsTrigger value="content" className="rounded-lg">Content</TabsTrigger>
+          <TabsTrigger value="publish" className="rounded-lg">Publish</TabsTrigger>
+        </TabsList>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Presentation size={18} className="text-red-500" />
-                      Add Video Lecture
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleAddVideo} className="space-y-3">
-                      <Input placeholder="Video Topic" value={newVideo.topicName} onChange={e => setNewVideo({...newVideo, topicName: e.target.value})} required />
-                      <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" value={newVideo.section} onChange={e => setNewVideo({...newVideo, section: e.target.value})}>
-                        <option value="Quantitative">Quantitative</option>
-                        <option value="VARC">VARC</option>
-                        <option value="DILR">DILR</option>
-                      </select>
-                      <Input placeholder="Video Link (Drive/YT)" value={newVideo.googleDriveLink} onChange={e => setNewVideo({...newVideo, googleDriveLink: e.target.value})} required />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Duration (e.g. 15m)" value={newVideo.duration} onChange={e => setNewVideo({...newVideo, duration: e.target.value})} />
-                        <Input placeholder="Instructor" value={newVideo.instructorName} onChange={e => setNewVideo({...newVideo, instructorName: e.target.value})} />
-                      </div>
-                      <Button type="submit" className="w-full">Save to Sheet</Button>
-                    </form>
-                  </CardContent>
-                </Card>
+        <TabsContent value="students" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Manage Students</CardTitle>
+              <CardDescription>View and manage student access categories.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted text-muted-foreground">
+                    <tr>
+                      <th className="text-left p-4 font-semibold uppercase tracking-wider">Student</th>
+                      <th className="text-left p-4 font-semibold uppercase tracking-wider">Exam Category</th>
+                      <th className="text-left p-4 font-semibold uppercase tracking-wider">Status</th>
+                      <th className="text-right p-4 font-semibold uppercase tracking-wider">Assign</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {students.map(s => (
+                      <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">{s.email}</div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {s.targetExam || "Not Set"}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant={s.status === "Active" ? "default" : "secondary"}>{s.status}</Badge>
+                        </td>
+                        <td className="p-4 text-right">
+                          <Select 
+                            value={s.targetExam} 
+                            onValueChange={(val) => updateStudentExam(s.id, val)}
+                          >
+                            <SelectTrigger className="w-28 h-8 ml-auto">
+                              <SelectValue placeholder="Assign" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CAT">CAT</SelectItem>
+                              <SelectItem value="GMAT">GMAT</SelectItem>
+                              <SelectItem value="CUET">CUET</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      </tr>
+                    ))}
+                    {students.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-10 text-center text-muted-foreground italic">
+                          No students found in the database.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="queue" className="space-y-4 pt-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <ClipboardList size={20} className="text-primary" />
-                  Verification Queue
-                </h2>
-                {unverified.length > 0 && (
-                  <Button size="sm" onClick={() => handleVerify(unverified.map(q => q.id), 'approve')}>Approve All</Button>
-                )}
-              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {unverified.map((q) => q && (
-                <Card key={q.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <Badge>{q.section}</Badge>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleVerify([q.id], 'reject')} className="text-red-500 hover:text-red-600">Reject</Button>
-                        <Button size="sm" onClick={() => handleVerify([q.id], 'approve')}>Approve</Button>
-                      </div>
-                    </div>
-                    <CardTitle className="text-base mt-2">{q.questionText}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {q.options.map((opt: string) => (
-                        <div key={opt} className={`p-2 rounded border text-xs ${opt === q.correctAnswer ? "bg-green-50 border-green-200 font-bold" : ""}`}>
-                          {opt}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground bg-secondary/30 p-3 rounded">
-                      <span className="font-bold">Explanation:</span> {q.explanation}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-              {unverified.length === 0 && (
-                <div className="text-center py-20 bg-background rounded-2xl border border-dashed">
-                  <p className="text-muted-foreground">Queue is empty. AI Generate new questions to begin.</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="approved" className="space-y-4 pt-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <ShieldCheck size={20} className="text-green-500" />
-                  Approved Repository
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {approved.slice().reverse().slice(0, 20).map((q) => q && (
-                  <Card key={q.id} className="opacity-80">
-                    <CardHeader className="p-4 pb-2">
-                      <div className="flex justify-between">
-                        <Badge variant="outline">{q.section}</Badge>
-                        <span className="text-[10px] text-muted-foreground">{new Date(q.approvedDate).toLocaleDateString()}</span>
-                      </div>
-                      <CardTitle className="text-sm line-clamp-2 mt-1">{q.questionText}</CardTitle>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-              {approved.length === 0 && (
-                <div className="text-center py-20 bg-background rounded-2xl border border-dashed">
-                  <p className="text-muted-foreground">No approved questions yet.</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold">Quick Actions</h2>
-          <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <User size={18} />
-              Manage Students
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <BookOpen size={18} />
-              Add Course Material
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <Video size={18} />
-              Upload Lecture
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <AlertCircle size={18} />
-              Post Announcement
-            </Button>
+        <TabsContent value="queue" className="mt-6 space-y-6">
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+            <div className="flex gap-4 items-center">
+              <Select value={examType} onValueChange={(val: any) => setExamType(val)}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CAT">CAT</SelectItem>
+                  <SelectItem value="GMAT">GMAT</SelectItem>
+                  <SelectItem value="CUET">CUET</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleGenerate} disabled={generating} className="gap-2">
+                <BrainCircuit size={18} />
+                {generating ? "Generating..." : `Generate ${examType} Questions`}
+              </Button>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1"><Badge variant="outline">{unverified.length}</Badge> In Queue</span>
+              <span className="flex items-center gap-1"><Badge variant="outline" className="text-green-600">{approved.length}</Badge> Approved</span>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {unverified.map(q => q && (
+              <Card key={q.id} className="shadow-sm">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex gap-2">
+                      <Badge variant="secondary">{q.targetExam}</Badge>
+                      <Badge variant="outline">{q.section}</Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => handleVerify([q.id], 'reject')}>
+                        <XCircle size={18} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" onClick={() => handleVerify([q.id], 'approve')}>
+                        <CheckCircle2 size={18} />
+                      </Button>
+                    </div>
+                  </div>
+                  <CardTitle className="text-sm font-medium leading-relaxed">{q.questionText}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold mt-2">Correct Answer: {q.correctAnswer}</div>
+                </CardContent>
+              </Card>
+            ))}
+            {unverified.length === 0 && (
+               <div className="col-span-full py-20 text-center bg-background rounded-2xl border border-dashed text-muted-foreground">
+                  Verification queue is empty. Generate new questions to begin.
+               </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="content" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader><CardTitle>Course Material</CardTitle></CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddMaterial} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Target Exam</Label>
+                      <Select value={newMaterial.targetExam} onValueChange={(val: any) => setNewMaterial(p => ({ ...p, targetExam: val }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CAT">CAT</SelectItem>
+                          <SelectItem value="GMAT">GMAT</SelectItem>
+                          <SelectItem value="CUET">CUET</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Section</Label>
+                      <Select value={newMaterial.section} onValueChange={(val: any) => setNewMaterial(p => ({ ...p, section: val }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Quantitative">Quantitative</SelectItem>
+                          <SelectItem value="DILR">DILR</SelectItem>
+                          <SelectItem value="VARC">VARC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Topic Name</Label>
+                    <Input value={newMaterial.topicName} onChange={e => setNewMaterial(p => ({ ...p, topicName: e.target.value }))} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sheet Link (Optional)</Label>
+                    <Input value={newMaterial.googleSheetLink} onChange={e => setNewMaterial(p => ({ ...p, googleSheetLink: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Drive Link</Label>
+                    <Input value={newMaterial.googleDriveLink} onChange={e => setNewMaterial(p => ({ ...p, googleDriveLink: e.target.value }))} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input value={newMaterial.description} onChange={e => setNewMaterial(p => ({ ...p, description: e.target.value }))} />
+                  </div>
+                  <Button type="submit" className="w-full">Add Material</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Video Lecture</CardTitle></CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddVideo} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Target Exam</Label>
+                      <Select value={newVideo.targetExam} onValueChange={(val: any) => setNewVideo(p => ({ ...p, targetExam: val }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CAT">CAT</SelectItem>
+                          <SelectItem value="GMAT">GMAT</SelectItem>
+                          <SelectItem value="CUET">CUET</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Duration (Min)</Label>
+                      <Input type="number" value={newVideo.duration} onChange={e => setNewVideo(p => ({ ...p, duration: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Topic Name</Label>
+                    <Input value={newVideo.topicName} onChange={e => setNewVideo(p => ({ ...p, topicName: e.target.value }))} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Instructor</Label>
+                    <Input value={newVideo.instructorName} onChange={e => setNewVideo(p => ({ ...p, instructorName: e.target.value }))} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Drive Link</Label>
+                    <Input value={newVideo.googleDriveLink} onChange={e => setNewVideo(p => ({ ...p, googleDriveLink: e.target.value }))} required />
+                  </div>
+                  <Button type="submit" className="w-full">Add Video</Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="publish" className="mt-6">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle>Daily Test Controller</CardTitle>
+              <CardDescription>Select a category and publish today's random test set.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex justify-center gap-4">
+                <Select value={examType} onValueChange={(v: any) => setExamType(v)}>
+                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CAT">CAT</SelectItem>
+                    <SelectItem value="GMAT">GMAT</SelectItem>
+                    <SelectItem value="CUET">CUET</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="lg" onClick={handlePublishTest} disabled={publishing}>
+                  {publishing ? "Publishing..." : `Publish Today's ${examType} Test`}
+                </Button>
+              </div>
+              <div className="p-6 bg-secondary/20 rounded-2xl border border-dashed text-center">
+                <p className="text-sm text-muted-foreground">
+                  Note: Publishing picks the 20 most recent approved questions for the selected category that haven't been recently used in a test.
+                </p>
+                <div className="mt-4 flex justify-center gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{approved.filter(q => q.targetExam === examType).length}</div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground">Available</div>
+                  </div>
+                  <div className="w-px h-8 bg-border" />
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">20</div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground">Required</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
