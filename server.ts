@@ -302,10 +302,10 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
   app.post("/api/generate-questions", authenticateToken, async (req: any, res) => {
   if (req.user.role !== 'admin') return res.sendStatus(403);
   
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-    
- export async function generateDailyQuestions(examType: "CAT" | "GMAT" | "CUET" = "CAT") {
+// 1. Define the generateDailyQuestions function OUTSIDE the route handlers
+export async function generateDailyQuestions(examType: "CAT" | "GMAT" | "CUET" = "CAT") {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+  
   const prompt = `Generate 20 MCQ questions for ${examType} exam preparation.
     - 7 Quantitative Aptitude (Medium-Hard difficulty)
     - 7 DILR (Data Interpretation & Logical Reasoning)
@@ -319,30 +319,50 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
     - explanation: string
     - difficulty: "Medium" | "Hard"`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              section: { type: Type.STRING },
-              questionText: { type: Type.STRING },
-              options: { type: Type.ARRAY, items: { type: Type.STRING } },
-              correctAnswer: { type: Type.STRING },
-              explanation: { type: Type.STRING },
-              difficulty: { type: Type.STRING }
-            },
-            required: ["section", "questionText", "options", "correctAnswer", "explanation", "difficulty"]
-          }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            section: { type: Type.STRING },
+            questionText: { type: Type.STRING },
+            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+            correctAnswer: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+            difficulty: { type: Type.STRING }
+          },
+          required: ["section", "questionText", "options", "correctAnswer", "explanation", "difficulty"]
         }
       }
-    });
+    }
+  });
 
-    const questions = JSON.parse(response.text);
+  return JSON.parse(response.text());
+}
+
+// 2. Now use the function in your route handlers
+app.post("/api/chat", authenticateToken, async (req: any, res) => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    // ... your chat logic
+    res.json({ reply: result.response.text() });
+  } catch (err: any) {
+    console.error("Gemini API error:", err.message);
+    res.status(500).json({ error: "AI request failed" });
+  }
+});
+
+app.post("/api/generate-questions", authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'admin') return res.sendStatus(403);
+
+  try {
+    const examType = req.body.examType || "CAT"; // Get from request if provided
+    const questions = await generateDailyQuestions(examType);
     res.json(questions);
   } catch (err: any) {
     console.error("Gemini error:", err.message);
