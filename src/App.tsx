@@ -1410,45 +1410,44 @@ function AdminDashboard({ user }: { user: UserProfile }) {
   };
 
   const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      const response = await fetch(`/api/generate-questions/${examType}`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${localStorage.getItem("token")}`
-  }
-});
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+  setGenerating(true);
+  try {
+    console.log(`Generating ${examType} questions...`);
+    
+    const response = await fetch(`/api/generate-questions/${examType}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`
       }
-const questions = await response.json();
-      await apiRequest("/questions/save-unverified", {
-        method: "POST",
-        body: JSON.stringify({ questions })
-      });
-      refreshQueue();
-      toast.success(`Generated 20 new ${examType} questions!`);
-    } catch (err: any) {
-      toast.error("Generation failed: " + err.message);
-    } finally {
-      setGenerating(false);
+    });
+ 
+    // Log response details for debugging
+    console.log(`Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      console.error("API Error Details:", errorData);
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
-  };
-
-
-  const handleVerify = async (ids: string[], action: 'approve' | 'reject') => {
-    try {
-      await apiRequest("/questions/verify", {
-        method: "POST",
-        body: JSON.stringify({ questionIds: ids, action })
-      });
-      refreshQueue();
-      toast.success(`Questions ${action}ed successfully`);
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
+ 
+    const questions = await response.json();
+    console.log(`Received ${questions.length} questions`);
+    
+    await apiRequest("/questions/save-unverified", {
+      method: "POST",
+      body: JSON.stringify({ questions })
+    });
+    
+    refreshQueue();
+    toast.success(`Generated 20 new ${examType} questions!`);
+  } catch (err: any) {
+    console.error("Generation error:", err);
+    toast.error("Generation failed: " + (err.message || "Unknown error"));
+  } finally {
+    setGenerating(false);
+  }
+};
 
   const handlePublishTest = async () => {
     const categoryApproved = approved.filter(q => q.targetExam === examType);
