@@ -305,7 +305,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-  onst prompt = `Generate exactly 20 multiple-choice exam questions for ${examType} exam. 
+  const prompt = `Generate exactly 20 multiple-choice exam questions for ${examType} exam. 
     Distribute them across sections: 7 Quantitative, 7 DILR, 6 VARC.
     
     Return ONLY valid JSON array with this exact structure for each question:
