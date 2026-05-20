@@ -849,7 +849,7 @@ function DailyTest({ user }: { user: UserProfile }) {
                     )}
                   </div>
                    </div>
-                  <CardTitle className="text-lg">{t.targetExam} Practice Test</CardTitle>
+                  <CardTitle className="text-lg"> Practice Test</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
