@@ -713,7 +713,7 @@ function DailyTest({ user }: { user: UserProfile }) {
     setLoading(true);
     try {
       const [tests, results] = await Promise.all([
-        apiRequest("/daily-tests"),
+        apiRequest("/daily-tests?targetExam=ALL"),
         apiRequest("/performance")
       ]);
       setAvailableTests(tests);
