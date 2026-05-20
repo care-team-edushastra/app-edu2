@@ -841,7 +841,7 @@ function DailyTest({ user }: { user: UserProfile }) {
                   <div className="flex justify-between items-center mb-2">
                     <Badge variant="outline">{new Date(t.testDate).toLocaleDateString()}</Badge>
                      <div className="flex gap-2">
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t.targetExam}</Badge>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"></Badge>
                     {attempts[t.id] ? (
                       <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Completed</Badge>
                     ) : (
@@ -1195,7 +1195,7 @@ const handleReview = async (res: any) => {
                   <span className="text-[10px] opacity-80">%</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Daily Practice Test</h3>
+                  <h3 className="font-bold text-lg"> Test</h3>
                   <p className="text-sm text-muted-foreground">{new Date(res.testDate).toLocaleDateString()} • {Math.floor(res.timeSpent / 60)}m spent</p>
                 </div>
               </div>
