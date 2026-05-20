@@ -319,7 +319,6 @@ try {
     - explanation: string
     - difficulty: "Medium" | "Hard"
     - targetExam: "${examType}"`
-    }
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
